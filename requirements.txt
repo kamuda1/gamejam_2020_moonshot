@@ -6,3 +6,5 @@ tensorboardX==1.2
 torch==0.4.1
 torchvision==0.2.1
 tqdm==4.23.4
+pymunk~=5.7.0
+pygame~=2.0.0

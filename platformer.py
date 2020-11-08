@@ -1,27 +1,12 @@
-"""
-Sample Python/Pygame Programs
-Simpson College Computer Science
-http://programarcadegames.com/
-http://simpson.edu/computer-science/
+import math
 
-From:
-http://programarcadegames.com/python_examples/f.php?file=platform_moving.py
-
-Explanation video: http://youtu.be/YKdOD5VkY48
-
-Part of a series:
-http://programarcadegames.com/python_examples/f.php?file=move_with_walls_example.py
-http://programarcadegames.com/python_examples/f.php?file=maze_runner.py
-http://programarcadegames.com/python_examples/f.php?file=platform_jumper.py
-http://programarcadegames.com/python_examples/f.php?file=platform_scroller.py
-http://programarcadegames.com/python_examples/f.php?file=platform_moving.py
-http://programarcadegames.com/python_examples/sprite_sheets/
-"""
+import pymunk
+from pygame.color import *
+from pygame.locals import *
+from pymunk import Vec2d
 import pygame
 import random
 import numpy as np
-
-# Global constants
 
 # Colors
 BLACK = (0, 0, 0)
@@ -33,6 +18,11 @@ BLUE = (0, 0, 255)
 # Screen dimensions
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 650
+
+
+def flipy(y):
+    """Small hack to convert chipmunk physics to pygame coordinates"""
+    return -y + 600
 
 
 class Player(pygame.sprite.Sprite):
@@ -77,11 +67,13 @@ class Player(pygame.sprite.Sprite):
         for block in block_hit_list:
             # If we are moving right,
             # set our right side to the left side of the item we hit
-            if self.change_x > 0:
-                self.rect.right = block.rect.left
-            elif self.change_x < 0:
-                # Otherwise if we are moving left, do the opposite.
-                self.rect.left = block.rect.right
+            if not ((self.rect.bottom < block.rect.bottom and self.rect.top < block.rect.bottom) or
+                    (self.rect.bottom > block.rect.top and self.rect.top > block.rect.top)):
+                if self.change_x > 0 and self.rect.right > block.rect.left:
+                    self.rect.right = block.rect.left
+                if self.change_x < 0 and self.rect.left < block.rect.right:
+                    # Otherwise if we are moving left, do the opposite.
+                    self.rect.left = block.rect.right
 
         # Move up/down
         self.rect.y += self.change_y
@@ -91,11 +83,18 @@ class Player(pygame.sprite.Sprite):
         for block in block_hit_list:
 
             # Reset our position based on the top/bottom of the object.
-            if self.change_y > 0:
-                self.rect.bottom = block.rect.top
-            elif self.change_y < 0:
-                self.rect.top = block.rect.bottom
+            # if self.change_y > 0:
+            #     self.rect.bottom = block.rect.top
+            # elif self.change_y < 0:
+            #     self.rect.top = block.rect.bottom
 
+            if ((self.rect.bottom < block.rect.bottom and self.rect.top < block.rect.bottom) or
+                    (self.rect.bottom > block.rect.top and self.rect.top > block.rect.top)):
+                if self.change_y > 0 and self.rect.top < block.rect.bottom:
+                    self.rect.bottom = block.rect.top
+                if self.change_y < 0 and self.rect.bottom > block.rect.top:
+                    # Otherwise if we are moving left, do the opposite.
+                    self.rect.top = block.rect.bottom
             # Stop our vertical movement
             self.change_y = 0
 
@@ -227,8 +226,18 @@ class FallingPlatform(Platform):
     change_y = 0
 
     player = None
-
     level = None
+
+    def update_with_colision(self, colision_object):
+        # self.rect.x += self.change_x
+        hit = pygame.sprite.collide_rect(self, colision_object)
+        if hit:
+            self.change_x *= -1
+
+        # self.rect.y += self.change_y
+        hit = pygame.sprite.collide_rect(self, colision_object)
+        if hit:
+            self.change_y *= -1
 
     def update(self):
         """ Move the platform.
@@ -240,40 +249,16 @@ class FallingPlatform(Platform):
 
         self.die()
 
-        # Move left/right
         self.rect.x += self.change_x
-
-        # See if we hit the player
-        hit = pygame.sprite.collide_rect(self, self.player)
-        if hit:
-            # We did hit the player. Shove the player around and
-            # assume he/she won't hit anything else.
-
-            # If we are moving right, set our right side
-            # to the left side of the item we hit
-            if self.change_x < 0:
-                self.player.rect.right = self.rect.left
-            else:
-                # Otherwise if we are moving left, do the opposite.
-                self.player.rect.left = self.rect.right
-
-        # Move up/down
         self.rect.y += self.change_y
+        self.update_with_colision(self.player)
 
-        # Check and see if we the player
-        hit = pygame.sprite.collide_rect(self, self.player)
-        if hit:
-            # We did hit the player. Shove the player around and
-            # assume he/she won't hit anything else.
-
-            # Reset our position based on the top/bottom of the object.
-            if self.change_y < 0:
-                self.player.rect.bottom = self.rect.top
-            else:
-                self.player.rect.top = self.rect.bottom
+        for platform in self.level.platform_list:
+            if self != platform:
+                self.update_with_colision(platform)
 
     def die(self):
-        if self.rect.y > SCREEN_HEIGHT:
+        if self.rect.y > SCREEN_HEIGHT or self.rect.y < -100:
             self.kill()
 
 
@@ -300,16 +285,14 @@ class Level(object):
     def update(self):
         """ Update everything in this level."""
 
-        if random.random() < 0.01:
-
-            block = FallingPlatform(20, 100)
+        if random.random() < 0.05:
+            block = FallingPlatform(120, 10)
             block.rect.x = self.world_shift + np.random.randint(200, 1000)
             block.rect.y = -100
             block.change_y = 1
             block.player = self.player
             block.level = self
             self.platform_list.add(block)
-
 
         self.platform_list.update()
         self.enemy_list.update()
@@ -350,21 +333,6 @@ class Level_01(Level):
         Level.__init__(self, player)
 
         self.level_limit = -1500
-
-        # Array with width, height, x, and y of platform
-        level = [[210, 70, 500, 500],
-                 [210, 70, 800, 400],
-                 [210, 70, 1000, 500],
-                 [210, 70, 1120, 280],
-                 ]
-
-        # Go through the array above and add platforms
-        for platform in level:
-            block = Platform(platform[0], platform[1])
-            block.rect.x = platform[2]
-            block.rect.y = platform[3]
-            block.player = self.player
-            self.platform_list.add(block)
 
         # Add a custom moving platform
         block = MovingPlatform(70, 40)
@@ -428,7 +396,37 @@ class Level_02(Level):
 def main():
     """ Main Program """
     pygame.init()
+    # #### pygame
+    screen = pygame.display.set_mode((600, 600))
+    clock = pygame.time.Clock()
+    running = True
 
+    ### Physics stuff
+    space = pymunk.Space()
+    space.gravity = Vec2d(0.0, -400.0)
+
+    ## logo
+    logo_img = pygame.image.load("nacho_sprite.jpg")
+    logos = []
+
+    ### Static line
+    ticks_to_next_spawn = 10
+
+    x = random.randint(20, 400)
+    y = 500
+    angle = random.random() * math.pi
+    vs = [(-23, 26), (23, 26), (0, -26)]
+    mass = 10
+    moment = pymunk.moment_for_poly(mass, vs)
+    body = pymunk.Body(mass, moment)
+    shape = pymunk.Poly(body, vs)
+    shape.friction = 0.5
+    body.position = x, y
+    body.angle = angle
+
+    space.add(body, shape)
+    logos.append(shape)
+    # #### pygame
     # Set the height and width of the screen
     size = [SCREEN_WIDTH, SCREEN_HEIGHT]
     screen = pygame.display.set_mode(size)
@@ -480,18 +478,44 @@ def main():
                 if event.key == pygame.K_RIGHT and player.change_x > 0:
                     player.stop()
 
+        # #####
+
+        dt = 1.0 / 60.0
+        for x in range(5):
+            space.step(dt)
+
+        ### Draw stuff
+        for logo_shape in logos:
+            # image draw
+            p = logo_shape.body.position
+            p = Vec2d(p.x, flipy(p.y))
+
+            # we need to rotate 180 degrees because of the y coordinate flip
+            angle_degrees = math.degrees(logo_shape.body.angle) + 180
+            rotated_logo_img = pygame.transform.rotate(logo_img, angle_degrees)
+
+            offset = Vec2d(rotated_logo_img.get_size()) / 2.
+            p = p - offset
+
+            screen.blit(rotated_logo_img, p)
+
+            # debug draw
+            ps = [p.rotated(logo_shape.body.angle) + logo_shape.body.position for p in logo_shape.get_vertices()]
+            ps = [(p.x, flipy(p.y)) for p in ps]
+            ps += [ps[0]]
+            pygame.draw.lines(screen, THECOLORS["red"], False, ps, 1)
+
+
+        ### Flip screen
+        pygame.display.flip()
+        clock.tick(50)
+        pygame.display.set_caption("fps: " + str(clock.get_fps()))
+        # #####
+
+
+
         # Update the player.
         active_sprite_list.update()
-
-        # if random.random() < 0.1:
-        #     block = FallingPlatform(70, 100)
-        #     block.rect.x = 550
-        #     block.rect.y = 200
-        #     block.change_y = 1
-        #     block.player = player
-        #
-        #     current_level.platform_list.add(block)
-        # Update items in the level
         current_level.update()
 
         # If the player gets near the right side, shift the world left (-x)
@@ -522,11 +546,11 @@ def main():
         # ALL CODE TO DRAW SHOULD GO BELOW THIS COMMENT
         current_level.draw(screen)
         active_sprite_list.draw(screen)
-
+        # space.step(0.02)  # Step the simulation one step forward
         # ALL CODE TO DRAW SHOULD GO ABOVE THIS COMMENT
 
         # Limit to 60 frames per second
-        clock.tick(60)
+        # clock.tick(60)
 
         # Go ahead and update the screen with what we've drawn.
         pygame.display.flip()
