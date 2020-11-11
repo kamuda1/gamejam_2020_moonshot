@@ -14,7 +14,7 @@ def flipy(y):
 
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self, space, init_pos=(0, 0), image_shape=None):
+    def __init__(self, space, clock, init_pos=(0, 0), image_shape=None):
         super().__init__()
         self.image = pygame.image.load("nacho_sprite.png")
         if image_shape:
@@ -35,26 +35,31 @@ class Player(pygame.sprite.Sprite):
         self.shape = pymunk.Poly(self.body, vs)
         self.shape.friction = 0.5
         self.space.add(self.body, self.shape)
+        self.cooldown_tracker = -1
+        self.clock = clock
+        self.can_jump = False
 
     def update(self, events, dt, other_sprites=None):
         pressed = pygame.key.get_pressed()
-        move = pygame.Vector2((0, 0))
         non_player_sprites = other_sprites.copy()
         non_player_sprites.remove(self)
         is_collided = pygame.sprite.spritecollideany(self, non_player_sprites)
+        lateral_strength = 20 if is_collided else 5
 
-        if pressed[pygame.K_w] and is_collided:
-            move += (0, 1)
-            move.normalize_ip()
-            self.body.apply_impulse_at_local_point(move * 100)
-        if pressed[pygame.K_a] and is_collided:
-            move += (-1, 0)
-            move.normalize_ip()
-            self.body.apply_impulse_at_local_point(move * 20)
-        if pressed[pygame.K_d] and is_collided:
-            move += (1, 0)
-            move.normalize_ip()
-            self.body.apply_impulse_at_local_point(move * 20)
+        if is_collided:
+            self.can_jump = True
+
+        move = pygame.Vector2((0, 0))
+
+        if pressed[pygame.K_w] and self.body.velocity[1] < 10 and self.can_jump:
+            self.can_jump = False
+            self.cooldown_tracker = 2000
+            move += pygame.Vector2((0, 1)) * 500
+        if pressed[pygame.K_a]:
+            move += pygame.Vector2((-1, 0)) * lateral_strength
+        if pressed[pygame.K_d]:
+            move += pygame.Vector2((1, 0)) * lateral_strength
+        self.body.apply_impulse_at_local_point(move)
 
         # if you used pymunk before, you'll probably already know
         # that you'll have to invert the y-axis to convert between
@@ -63,6 +68,7 @@ class Player(pygame.sprite.Sprite):
         self.pos = pygame.Vector2(self.body.position[0], -self.body.position[1]+500)
         self.rect.center = self.pos
         self.body.angle = 0
+
 
 class Satellite(pygame.sprite.Sprite):
     def __init__(self, space, image_filename, init_pos=(0, 0), init_velocity=(0, 0), mass=1, image_shape=None):
@@ -92,29 +98,20 @@ class Satellite(pygame.sprite.Sprite):
         self.rect.center = self.pos
 
     def die(self):
-        SCREEN_HEIGHT = 1000
+        SCREEN_HEIGHT = 1500
         if self.rect.y > SCREEN_HEIGHT or self.rect.y < -100:
             self.kill()
+
 
 def create_geosynch_satellites(space):
     geosynch_satellite_sprites = []
 
-    mass = 200
-    image_filename = "satellite_large_img_transparent.png"
-    satellite = Satellite(space, image_filename, init_pos=(100, 30), mass=mass, image_shape=(100, 50))
-    geosynch_satellite_sprites.append(satellite)
-
-    satellite = Satellite(space, image_filename, init_pos=(250, 50), mass=mass, image_shape=(100, 50))
-    geosynch_satellite_sprites.append(satellite)
-
-    satellite = Satellite(space, image_filename, init_pos=(400, 70), mass=mass, image_shape=(100, 50))
-    geosynch_satellite_sprites.append(satellite)
-
-    satellite = Satellite(space, image_filename, init_pos=(550, 90), mass=mass, image_shape=(100, 50))
-    geosynch_satellite_sprites.append(satellite)
-
-    satellite = Satellite(space, image_filename, init_pos=(700, 110), mass=mass, image_shape=(100, 50))
-    geosynch_satellite_sprites.append(satellite)
+    mass = 500
+    for x_pos in np.arange(100, 3000, 150):
+        y_pos = np.random.uniform(900, 1000)
+        image_filename = "satellite_large_img_transparent.png"
+        satellite = Satellite(space, image_filename, init_pos=(x_pos, y_pos), mass=mass, image_shape=(100, 50))
+        geosynch_satellite_sprites.append(satellite)
 
     return geosynch_satellite_sprites
 
@@ -129,7 +126,7 @@ def main():
     space = pymunk.Space()
     space.gravity = 0, 0
 
-    player = Player(space, (55, -10))
+    player = Player(space, clock=clock, init_pos=(90, 900))
 
     sprites = pygame.sprite.Group(player)
     level_sprite_list = create_geosynch_satellites(space)
@@ -139,7 +136,7 @@ def main():
     # so we actually have anything to move the camera to
 
     background_width = 15000
-    background_height = 1500
+    background_height = 1600
 
     background = pygame.Surface((background_width, background_height))
     background.fill((30, 30, 30))
@@ -160,8 +157,8 @@ def main():
         ticks_to_next_spawn -= 1
         if ticks_to_next_spawn <= 0:
             ticks_to_next_spawn = 10
-            x_pos = np.random.uniform(100, 400)
-            satellite = Satellite(space, "nacho_sprite.png", init_pos=(x_pos, 500), init_velocity=(10, 100))
+            x_pos = np.random.uniform(100, 3000)
+            satellite = Satellite(space, "nacho_sprite.png", init_pos=(x_pos, -80), init_velocity=(-10, -100))
             sprites.add(satellite)
 
         # copy/paste because I'm lazy
