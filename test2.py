@@ -14,8 +14,10 @@ def flipy(y):
 
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self, space, clock, init_pos=(0, 0), image_shape=None):
+    def __init__(self, space, init_pos=(0, 0), image_shape=None, is_player=True, is_geosynch=False):
         super().__init__()
+        self.is_geosynch = is_geosynch
+        self.is_player = is_player
         self.image = pygame.image.load("nacho_sprite.png")
         if image_shape:
             self.image = pygame.transform.scale(self.image, image_shape)
@@ -35,9 +37,7 @@ class Player(pygame.sprite.Sprite):
         self.shape = pymunk.Poly(self.body, vs)
         self.shape.friction = 0.5
         self.space.add(self.body, self.shape)
-        self.cooldown_tracker = -1
-        self.clock = clock
-        self.can_jump = False
+        self.can_jump = True
 
     def update(self, events, dt, other_sprites=None):
         pressed = pygame.key.get_pressed()
@@ -50,11 +50,9 @@ class Player(pygame.sprite.Sprite):
             self.can_jump = True
 
         move = pygame.Vector2((0, 0))
-
         if pressed[pygame.K_w] and self.body.velocity[1] < 10 and self.can_jump:
             self.can_jump = False
-            self.cooldown_tracker = 2000
-            move += pygame.Vector2((0, 1)) * 500
+            move += pygame.Vector2((0, 1)) * 300
         if pressed[pygame.K_a]:
             move += pygame.Vector2((-1, 0)) * lateral_strength
         if pressed[pygame.K_d]:
@@ -71,9 +69,14 @@ class Player(pygame.sprite.Sprite):
 
 
 class Satellite(pygame.sprite.Sprite):
-    def __init__(self, space, image_filename, init_pos=(0, 0), init_velocity=(0, 0), mass=1, image_shape=None):
+    def __init__(self, space, image_filename, init_pos=(0, 0), init_velocity=(0, 0), mass=1, image_shape=None,
+                 is_geosynch=False, is_player=False):
         super().__init__()
         self.image = pygame.image.load(image_filename)
+        self.is_geosynch = is_geosynch
+        self.is_player = is_player
+
+        self.health = 1
         if image_shape:
             self.image = pygame.transform.scale(self.image, image_shape)
         self.rect = self.image.get_bounding_rect()
@@ -93,14 +96,32 @@ class Satellite(pygame.sprite.Sprite):
         self.space.add(self.body, self.shape)
 
     def update(self, events, dt, other_sprites=None):
-        self.die()
         self.pos = pygame.Vector2(self.body.position[0], -self.body.position[1]+500)
         self.rect.center = self.pos
 
-    def die(self):
+        non_player_sprites = other_sprites.copy()
+        non_player_sprites.remove(self)
+        is_collided = pygame.sprite.spritecollideany(self, non_player_sprites)
+
+        if is_collided and self.is_geosynch and not is_collided.is_player and not is_collided.is_geosynch:
+            self.health -= 1
+            self.kill()
+            self.space.remove(self.body, self.shape)
+
+        if self.health < 0 and self.is_geosynch is False:
+            self.kill()
+            self.space.remove(self.body, self.shape)
+            satellite = Satellite(self.space, "nacho_sprite.png", init_pos=self.body.position, init_velocity=(0, 10))
+            other_sprites.add(satellite)
+
+        self.die(other_sprites)
+
+    def die(self, other_sprites):
         SCREEN_HEIGHT = 1500
         if self.rect.y > SCREEN_HEIGHT or self.rect.y < -100:
             self.kill()
+            self.space.remove(self.body, self.shape)
+
 
 
 def create_geosynch_satellites(space):
@@ -110,7 +131,8 @@ def create_geosynch_satellites(space):
     for x_pos in np.arange(100, 3000, 150):
         y_pos = np.random.uniform(900, 1000)
         image_filename = "satellite_large_img_transparent.png"
-        satellite = Satellite(space, image_filename, init_pos=(x_pos, y_pos), mass=mass, image_shape=(100, 50))
+        satellite = Satellite(space, image_filename, init_pos=(x_pos, y_pos), mass=mass, image_shape=(100, 50),
+                              is_geosynch=True)
         geosynch_satellite_sprites.append(satellite)
 
     return geosynch_satellite_sprites
@@ -126,7 +148,7 @@ def main():
     space = pymunk.Space()
     space.gravity = 0, 0
 
-    player = Player(space, clock=clock, init_pos=(90, 900))
+    player = Player(space, init_pos=(90, 900))
 
     sprites = pygame.sprite.Group(player)
     level_sprite_list = create_geosynch_satellites(space)
@@ -158,7 +180,10 @@ def main():
         if ticks_to_next_spawn <= 0:
             ticks_to_next_spawn = 10
             x_pos = np.random.uniform(100, 3000)
-            satellite = Satellite(space, "nacho_sprite.png", init_pos=(x_pos, -80), init_velocity=(-10, -100))
+            init_velocity = (-10, -100)
+            # x_pos = 90
+            # init_velocity = (-10, 0)
+            satellite = Satellite(space, "nacho_sprite.png", init_pos=(x_pos, -80), init_velocity=init_velocity)
             sprites.add(satellite)
 
         # copy/paste because I'm lazy
