@@ -53,15 +53,12 @@ class Player(pygame.sprite.Sprite):
         if pressed[pygame.K_w] and self.body.velocity[1] < 10 and self.can_jump:
             self.can_jump = False
             move += pygame.Vector2((0, 1)) * 300
-        if pressed[pygame.K_a]:
+        if pressed[pygame.K_a] and np.abs(self.body.velocity[1]) < 20:
             move += pygame.Vector2((-1, 0)) * lateral_strength
-        if pressed[pygame.K_d]:
+        if pressed[pygame.K_d] and np.abs(self.body.velocity[1]) < 20:
             move += pygame.Vector2((1, 0)) * lateral_strength
         self.body.apply_impulse_at_local_point(move)
 
-        # if you used pymunk before, you'll probably already know
-        # that you'll have to invert the y-axis to convert between
-        # the pymunk and the pygame coordinates.
         self.body.force = (0, -250)
         self.pos = pygame.Vector2(self.body.position[0], -self.body.position[1]+500)
         self.rect.center = self.pos
@@ -70,13 +67,16 @@ class Player(pygame.sprite.Sprite):
 
 class Satellite(pygame.sprite.Sprite):
     def __init__(self, space, image_filename, init_pos=(0, 0), init_velocity=(0, 0), mass=1, image_shape=None,
-                 is_geosynch=False, is_player=False):
+                 is_geosynch=False, is_player=False, screen_height=None):
+        if screen_height is None:
+            screen_height = 1500
+        self.screen_height = screen_height
         super().__init__()
         self.image = pygame.image.load(image_filename)
         self.is_geosynch = is_geosynch
         self.is_player = is_player
 
-        self.health = 1
+        self.health = 5
         if image_shape:
             self.image = pygame.transform.scale(self.image, image_shape)
         self.rect = self.image.get_bounding_rect()
@@ -103,36 +103,41 @@ class Satellite(pygame.sprite.Sprite):
         non_player_sprites.remove(self)
         is_collided = pygame.sprite.spritecollideany(self, non_player_sprites)
 
-        if is_collided and self.is_geosynch and not is_collided.is_player and not is_collided.is_geosynch:
+        if is_collided and self.is_geosynch and is_collided.is_player is False and is_collided.is_geosynch is False:
             self.health -= 1
+            is_collided.kill()
+            is_collided.space.remove(is_collided.body, is_collided.shape)
+
+        # if is_collided and self.is_geosynch is False and is_collided.is_player is False and is_collided.is_geosynch:
+        #     is_collided.health -= 1
+        #     self.kill()
+        #     self.space.remove(self.body, self.shape)
+
+        if self.health < 0 and self.is_geosynch is True:
             self.kill()
             self.space.remove(self.body, self.shape)
 
-        if self.health < 0 and self.is_geosynch is False:
-            self.kill()
-            self.space.remove(self.body, self.shape)
-            satellite = Satellite(self.space, "nacho_sprite.png", init_pos=self.body.position, init_velocity=(0, 10))
+            satellite = Satellite(self.space, "nacho_sprite.png", init_pos=self.body.position, init_velocity=(-5, 0),
+                                  screen_height=self.screen_height)
             other_sprites.add(satellite)
 
         self.die(other_sprites)
 
     def die(self, other_sprites):
-        SCREEN_HEIGHT = 1500
-        if self.rect.y > SCREEN_HEIGHT or self.rect.y < -100:
+        if self.rect.y > self.screen_height or self.rect.y < -100 or self.rect.x + 500 < other_sprites.sprites()[0].pos.x:
             self.kill()
             self.space.remove(self.body, self.shape)
 
 
 
-def create_geosynch_satellites(space):
+def create_geosynch_satellites(space, background_height: float, screen_height, image_filename):
     geosynch_satellite_sprites = []
 
     mass = 500
-    for x_pos in np.arange(100, 3000, 150):
-        y_pos = np.random.uniform(900, 1000)
-        image_filename = "satellite_large_img_transparent.png"
+    for x_pos in np.arange(750, 8000, 150):
+        y_pos = np.random.uniform(0.9 * background_height / 2, 1.1 * background_height / 2)
         satellite = Satellite(space, image_filename, init_pos=(x_pos, y_pos), mass=mass, image_shape=(100, 50),
-                              is_geosynch=True)
+                              is_geosynch=True, screen_height=screen_height)
         geosynch_satellite_sprites.append(satellite)
 
     return geosynch_satellite_sprites
@@ -145,20 +150,25 @@ def main():
     clock = pygame.time.Clock()
     dt = 0
 
+    x_offset = 500
+
+    image_filename = "satellite_large_img_transparent.png"
+    background_width = 15000
+    background_height = 800
+
     space = pymunk.Space()
     space.gravity = 0, 0
 
-    player = Player(space, init_pos=(90, 900))
+    player = Player(space, init_pos=(90 + x_offset, background_height / 2 - 10))
 
     sprites = pygame.sprite.Group(player)
-    level_sprite_list = create_geosynch_satellites(space)
+    level_sprite_list = create_geosynch_satellites(space, background_height, screen_height=background_height,
+                                                   image_filename=image_filename)
+
+    start_satellite = Satellite(space, image_filename, init_pos=(100 + x_offset, 50 + background_height / 2), mass=500,
+                                image_shape=(100, 50), is_geosynch=True, screen_height=background_height)
+    level_sprite_list.append(start_satellite)
     sprites.add(*level_sprite_list)
-
-    # the "world" is now bigger than the screen
-    # so we actually have anything to move the camera to
-
-    background_width = 15000
-    background_height = 1600
 
     background = pygame.Surface((background_width, background_height))
     background.fill((30, 30, 30))
@@ -178,12 +188,14 @@ def main():
 
         ticks_to_next_spawn -= 1
         if ticks_to_next_spawn <= 0:
-            ticks_to_next_spawn = 10
-            x_pos = np.random.uniform(100, 3000)
-            init_velocity = (-10, -100)
-            # x_pos = 90
-            # init_velocity = (-10, 0)
-            satellite = Satellite(space, "nacho_sprite.png", init_pos=(x_pos, -80), init_velocity=init_velocity)
+            ticks_to_next_spawn_init = 20
+            ticks_to_next_spawn = np.max([2, ticks_to_next_spawn_init - player.pos.x/1000])
+            x_pos = np.random.uniform(player.pos.x - 10, player.pos.x + 1000)
+            init_velocity_x = np.random.uniform(-5, 5)
+            init_velocity_y = -100 - np.random.lognormal(1, 3 + player.pos.x/500.)
+            init_velocity = (init_velocity_x, init_velocity_y)
+            satellite = Satellite(space, "nacho_sprite.png", init_pos=(x_pos, -10), init_velocity=init_velocity,
+                                  screen_height=background_height)
             sprites.add(satellite)
 
         # copy/paste because I'm lazy
