@@ -66,17 +66,25 @@ class Player(pygame.sprite.Sprite):
 
 
 class Satellite(pygame.sprite.Sprite):
-    def __init__(self, space, image_filename, init_pos=(0, 0), init_velocity=(0, 0), mass=1, image_shape=None,
+    def __init__(self, space, image_filename=None, init_pos=(0, 0), init_velocity=(0, 0), mass=1, image_shape=None,
                  is_geosynch=False, is_player=False, screen_height=None):
         if screen_height is None:
             screen_height = 1500
         self.screen_height = screen_height
         super().__init__()
+        self.satellite_images_health = None
+        if image_filename is None:
+            self.satellite_images_health = {'low': "satellite_large_low_health.png",
+                                            'med': "satellite_large_med_health.png",
+                                            'high': "satellite_large_high_health.png",
+                                            }
+            image_filename = self.satellite_images_health['high']
+
         self.image = pygame.image.load(image_filename)
         self.is_geosynch = is_geosynch
         self.is_player = is_player
 
-        self.health = 5
+        self.health = 6
         if image_shape:
             self.image = pygame.transform.scale(self.image, image_shape)
         self.rect = self.image.get_bounding_rect()
@@ -103,15 +111,16 @@ class Satellite(pygame.sprite.Sprite):
         non_player_sprites.remove(self)
         is_collided = pygame.sprite.spritecollideany(self, non_player_sprites)
 
+        if self.satellite_images_health:
+            if 3 < self.health <= 5:
+                self.image = pygame.image.load(self.satellite_images_health['med'])
+            if self.health <= 3:
+                self.image = pygame.image.load(self.satellite_images_health['low'])
+
         if is_collided and self.is_geosynch and is_collided.is_player is False and is_collided.is_geosynch is False:
             self.health -= 1
             is_collided.kill()
             is_collided.space.remove(is_collided.body, is_collided.shape)
-
-        # if is_collided and self.is_geosynch is False and is_collided.is_player is False and is_collided.is_geosynch:
-        #     is_collided.health -= 1
-        #     self.kill()
-        #     self.space.remove(self.body, self.shape)
 
         if self.health < 0 and self.is_geosynch is True:
             self.kill()
@@ -136,7 +145,7 @@ def create_geosynch_satellites(space, background_height: float, screen_height, i
     mass = 500
     for x_pos in np.arange(750, 8000, 150):
         y_pos = np.random.uniform(0.9 * background_height / 2, 1.1 * background_height / 2)
-        satellite = Satellite(space, image_filename, init_pos=(x_pos, y_pos), mass=mass, image_shape=(100, 50),
+        satellite = Satellite(space, init_pos=(x_pos, y_pos), mass=mass, image_shape=(100, 50),
                               is_geosynch=True, screen_height=screen_height)
         geosynch_satellite_sprites.append(satellite)
 
@@ -144,7 +153,7 @@ def create_geosynch_satellites(space, background_height: float, screen_height, i
 
 
 def main():
-    debug = True
+    debug = False
     pygame.init()
     screen = pygame.display.set_mode((500, 500))
     clock = pygame.time.Clock()
@@ -153,6 +162,7 @@ def main():
     x_offset = 500
 
     image_filename = "satellite_large_img_transparent.png"
+
     background_width = 15000
     background_height = 800
 
@@ -165,7 +175,7 @@ def main():
     level_sprite_list = create_geosynch_satellites(space, background_height, screen_height=background_height,
                                                    image_filename=image_filename)
 
-    start_satellite = Satellite(space, image_filename, init_pos=(100 + x_offset, 50 + background_height / 2), mass=500,
+    start_satellite = Satellite(space, init_pos=(100 + x_offset, 50 + background_height / 2), mass=500,
                                 image_shape=(100, 50), is_geosynch=True, screen_height=background_height)
     level_sprite_list.append(start_satellite)
     sprites.add(*level_sprite_list)
