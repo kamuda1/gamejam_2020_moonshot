@@ -57,11 +57,20 @@ class Player(pygame.sprite.Sprite):
             move += pygame.Vector2((-1, 0)) * lateral_strength
         if pressed[pygame.K_d] and np.abs(self.body.velocity[1]) < 20:
             move += pygame.Vector2((1, 0)) * lateral_strength
-        self.body.apply_impulse_at_local_point(move)
 
-        self.body.force = (0, -250)
-        self.pos = pygame.Vector2(self.body.position[0], -self.body.position[1]+500)
+        if self.body.position.x > 550:
+            self.body.apply_impulse_at_local_point(move)
+            self.body.force = (0, -250)
+
+        print(self.body.position[0])
+        if self.body.position.x < 550:
+            self.body.force = (1000, 200)
+            # self.body.position.x = 400
+            # print('update body ', self.body.position.x)
+        # print('update ', self.body.position.x)
+        self.pos = pygame.Vector2(self.body.position.x, -self.body.position.y+500)
         self.rect.center = self.pos
+
         self.body.angle = 0
 
 
@@ -110,6 +119,7 @@ class Satellite(pygame.sprite.Sprite):
         non_player_sprites = other_sprites.copy()
         non_player_sprites.remove(self)
         is_collided = pygame.sprite.spritecollideany(self, non_player_sprites)
+        satellite_to_return = None
 
         if self.satellite_images_health:
             if 3 < self.health <= 5:
@@ -119,18 +129,19 @@ class Satellite(pygame.sprite.Sprite):
 
         if is_collided and self.is_geosynch and is_collided.is_player is False and is_collided.is_geosynch is False:
             self.health -= 1
-            is_collided.kill()
             is_collided.space.remove(is_collided.body, is_collided.shape)
+            is_collided.kill()
 
         if self.health < 0 and self.is_geosynch is True:
-            self.kill()
             self.space.remove(self.body, self.shape)
-
-            satellite = Satellite(self.space, "nacho_sprite.png", init_pos=self.body.position, init_velocity=(-5, 0),
-                                  screen_height=self.screen_height)
-            other_sprites.add(satellite)
+            self.kill()
+            new_vect = pygame.Vector2(self.body.position[0], -self.body.position[1] + 500)
+            satellite_to_return = Satellite(self.space, "nacho_sprite.png", init_pos=new_vect,
+                                            init_velocity=(0, 5), screen_height=self.screen_height)
+            # other_sprites.add(satellite)
 
         self.die(other_sprites)
+        return satellite_to_return
 
     def die(self, other_sprites):
         if self.rect.y > self.screen_height or self.rect.y < -100 or self.rect.x + 500 < other_sprites.sprites()[0].pos.x:
@@ -138,8 +149,7 @@ class Satellite(pygame.sprite.Sprite):
             self.space.remove(self.body, self.shape)
 
 
-
-def create_geosynch_satellites(space, background_height: float, screen_height, image_filename):
+def create_geosynch_satellites(space, background_height: float, screen_height):
     geosynch_satellite_sprites = []
 
     mass = 500
@@ -168,12 +178,18 @@ def main():
 
     space = pymunk.Space()
     space.gravity = 0, 0
+    earth_image = pygame.image.load('earth.png')
+    earth_image = pygame.transform.scale(earth_image, (500, 800))
+    earth_center = (x_offset - 350, background_height / 2 - 300)
+
+    moon_image = pygame.image.load('moon.png')
+    moon_image = pygame.transform.scale(moon_image, (200, 200))
+    moon_center = (x_offset + 200, background_height / 2)
 
     player = Player(space, init_pos=(90 + x_offset, background_height / 2 - 10))
 
     sprites = pygame.sprite.Group(player)
-    level_sprite_list = create_geosynch_satellites(space, background_height, screen_height=background_height,
-                                                   image_filename=image_filename)
+    level_sprite_list = create_geosynch_satellites(space, background_height, screen_height=background_height)
 
     start_satellite = Satellite(space, init_pos=(100 + x_offset, 50 + background_height / 2), mass=500,
                                 image_shape=(100, 50), is_geosynch=True, screen_height=background_height)
@@ -200,30 +216,41 @@ def main():
         if ticks_to_next_spawn <= 0:
             ticks_to_next_spawn_init = 20
             ticks_to_next_spawn = np.max([2, ticks_to_next_spawn_init - player.pos.x/1000])
-            x_pos = np.random.uniform(player.pos.x - 10, player.pos.x + 1000)
+            x_pos = np.random.uniform(player.pos.x - 10, player.pos.x + 750)
             init_velocity_x = np.random.uniform(-5, 5)
             init_velocity_y = -100 - np.random.lognormal(1, 3 + player.pos.x/500.)
             init_velocity = (init_velocity_x, init_velocity_y)
+
+            init_size = np.random.uniform(5, 35)
             satellite = Satellite(space, "nacho_sprite.png", init_pos=(x_pos, -10), init_velocity=init_velocity,
-                                  screen_height=background_height)
+                                  screen_height=background_height, image_shape=(int(init_size), int(init_size)))
             sprites.add(satellite)
 
         # copy/paste because I'm lazy
         # just move the camera around
         pressed = pygame.key.get_pressed()
         camera_move = pygame.Vector2()
-        if pressed[pygame.K_UP]: camera_move += (0, 1)
-        if pressed[pygame.K_LEFT]: camera_move += (1, 0)
-        if pressed[pygame.K_DOWN]: camera_move += (0, -1)
-        if pressed[pygame.K_RIGHT]: camera_move += (-1, 0)
-        if camera_move.length() > 0: camera_move.normalize_ip()
-        # camera += camera_move*(dt / 5)
+        if pressed[pygame.K_UP]:
+            camera_move += (0, 1)
+        if pressed[pygame.K_LEFT]:
+            camera_move += (1, 0)
+        if pressed[pygame.K_DOWN]:
+            camera_move += (0, -1)
+        if pressed[pygame.K_RIGHT]:
+            camera_move += (-1, 0)
+        if camera_move.length() > 0:
+            camera_move.normalize_ip()
         camera = pygame.Vector2(-player.pos[0] + 210, -player.pos[1] + 210)
 
-        sprites.update(events, dt, sprites)
+        sprite_to_add = sprites.update(events, dt, sprites)
+        if sprite_to_add:
+            sprites.add(sprite_to_add)
 
         # before drawing, we shift everything by the camera's x and y values
         screen.blit(background, camera)
+        screen.blit(earth_image, earth_center + camera)
+        screen.blit(moon_image, moon_center + camera)
+
         for s in sprites:
 
             p = s.shape.body.position
