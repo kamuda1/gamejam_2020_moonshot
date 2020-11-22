@@ -14,13 +14,16 @@ def flipy(y):
 
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self, space, init_pos=(0, 0), image_shape=None, is_player=True, is_geosynch=False):
+    def __init__(self, space, init_pos=(0, 0), image_shape=None, is_player=True, is_geosynch=False, moon_center=(0, 0)):
         super().__init__()
+        self.game_over = False
         self.is_geosynch = is_geosynch
         self.is_player = is_player
-        self.image = pygame.image.load("nacho_sprite.png")
+        self.image = pygame.image.load("catstronaut.png")
+        self.moon_center = moon_center
         if image_shape:
             self.image = pygame.transform.scale(self.image, image_shape)
+            self.image = pygame.transform.flip(self.image, True, True)
         self.rect = self.image.get_bounding_rect()
         width = self.rect.width
         height = self.rect.height
@@ -45,33 +48,38 @@ class Player(pygame.sprite.Sprite):
         non_player_sprites.remove(self)
         is_collided = pygame.sprite.spritecollideany(self, non_player_sprites)
         lateral_strength = 20 if is_collided else 5
+        if self.game_over is False:
+            if is_collided:
+                self.can_jump = True
+            if self.body.position.x < self.moon_center[0] + 50:
+                move = pygame.Vector2((0, 0))
+                if pressed[pygame.K_w] and self.body.velocity[1] < 10 and self.can_jump:
+                    self.can_jump = False
+                    move += pygame.Vector2((0, 1)) * 300
+                if pressed[pygame.K_a] and np.abs(self.body.velocity[1]) < 20:
+                    move += pygame.Vector2((-1, 0)) * lateral_strength
+                if pressed[pygame.K_d] and np.abs(self.body.velocity[1]) < 20:
+                    move += pygame.Vector2((1, 0)) * lateral_strength
 
-        if is_collided:
-            self.can_jump = True
+                if self.body.position.x > 550:
+                    self.body.apply_impulse_at_local_point(move)
+                    self.body.force = (0, -250)
 
-        move = pygame.Vector2((0, 0))
-        if pressed[pygame.K_w] and self.body.velocity[1] < 10 and self.can_jump:
-            self.can_jump = False
-            move += pygame.Vector2((0, 1)) * 300
-        if pressed[pygame.K_a] and np.abs(self.body.velocity[1]) < 20:
-            move += pygame.Vector2((-1, 0)) * lateral_strength
-        if pressed[pygame.K_d] and np.abs(self.body.velocity[1]) < 20:
-            move += pygame.Vector2((1, 0)) * lateral_strength
+                if self.body.position.x < 550:
+                    self.body.force = (1000, 200)
+                self.pos = pygame.Vector2(self.body.position.x, -self.body.position.y+500)
+                self.rect.center = self.pos
 
-        if self.body.position.x > 550:
-            self.body.apply_impulse_at_local_point(move)
-            self.body.force = (0, -250)
+                self.body.angle = 0
+            else:
+                self.game_over = True
 
-        print(self.body.position[0])
-        if self.body.position.x < 550:
-            self.body.force = (1000, 200)
-            # self.body.position.x = 400
-            # print('update body ', self.body.position.x)
-        # print('update ', self.body.position.x)
-        self.pos = pygame.Vector2(self.body.position.x, -self.body.position.y+500)
-        self.rect.center = self.pos
-
-        self.body.angle = 0
+        elif (np.abs(self.body.position.x-self.moon_center[0]) > 20 or
+              np.abs((-self.body.position.y+500)-self.moon_center[1]) > 20):
+            applied_force = (-3*(self.body.position.x-self.moon_center[0]),
+                             3*((-self.body.position.y+500)-self.moon_center[1]))
+            self.body.force = applied_force
+            print(applied_force)
 
 
 class Satellite(pygame.sprite.Sprite):
@@ -149,11 +157,12 @@ class Satellite(pygame.sprite.Sprite):
             self.space.remove(self.body, self.shape)
 
 
-def create_geosynch_satellites(space, background_height: float, screen_height):
+def create_geosynch_satellites(space, background_height: float, screen_height, start_x: int = 750, end_x: int = 8000,
+                               diff_x: int = 150):
     geosynch_satellite_sprites = []
 
     mass = 500
-    for x_pos in np.arange(750, 8000, 150):
+    for x_pos in np.arange(start_x, end_x, diff_x):
         y_pos = np.random.uniform(0.9 * background_height / 2, 1.1 * background_height / 2)
         satellite = Satellite(space, init_pos=(x_pos, y_pos), mass=mass, image_shape=(100, 50),
                               is_geosynch=True, screen_height=screen_height)
@@ -174,22 +183,25 @@ def main():
     image_filename = "satellite_large_img_transparent.png"
 
     background_width = 15000
-    background_height = 800
+    background_height = 1500
+    level_end = 2000
 
     space = pymunk.Space()
     space.gravity = 0, 0
     earth_image = pygame.image.load('earth.png')
-    earth_image = pygame.transform.scale(earth_image, (500, 800))
-    earth_center = (x_offset - 350, background_height / 2 - 300)
+    earth_image = pygame.transform.scale(earth_image, (background_height//2, background_height//2))
+    earth_center = (x_offset - 650, background_height / 2 - 300)
 
     moon_image = pygame.image.load('moon.png')
     moon_image = pygame.transform.scale(moon_image, (200, 200))
-    moon_center = (x_offset + 200, background_height / 2)
+    moon_center = (x_offset + level_end + 400, background_height / 2)
 
-    player = Player(space, init_pos=(90 + x_offset, background_height / 2 - 10))
+    player = Player(space, init_pos=(90 + x_offset, background_height / 2 - 10), image_shape=[50, 30],
+                    moon_center=moon_center)
 
     sprites = pygame.sprite.Group(player)
-    level_sprite_list = create_geosynch_satellites(space, background_height, screen_height=background_height)
+    level_sprite_list = create_geosynch_satellites(space, background_height, screen_height=background_height,
+                                                   end_x=x_offset + level_end)
 
     start_satellite = Satellite(space, init_pos=(100 + x_offset, 50 + background_height / 2), mass=500,
                                 image_shape=(100, 50), is_geosynch=True, screen_height=background_height)
@@ -204,7 +216,7 @@ def main():
 
     for _ in range(80000):
         x, y = random.randint(0, background_width), random.randint(0, background_height)
-        pygame.draw.rect(background, pygame.Color('green'), (x, y, 2, 2))
+        pygame.draw.rect(background, (200, 200, 200), (x, y, 2, 2))
     ticks_to_next_spawn = 10
     while True:
         events = pygame.event.get()
@@ -213,10 +225,14 @@ def main():
                 return
 
         ticks_to_next_spawn -= 1
-        if ticks_to_next_spawn <= 0:
+        if ticks_to_next_spawn <= 0 and player.pos.x < x_offset + level_end:
             ticks_to_next_spawn_init = 20
             ticks_to_next_spawn = np.max([2, ticks_to_next_spawn_init - player.pos.x/1000])
-            x_pos = np.random.uniform(player.pos.x - 10, player.pos.x + 750)
+
+            x_pos_max = player.pos.x + 750
+            if x_pos_max > x_offset + level_end:
+                x_pos_max = x_offset + level_end - 100
+            x_pos = np.random.uniform(player.pos.x - 10, x_pos_max)
             init_velocity_x = np.random.uniform(-5, 5)
             init_velocity_y = -100 - np.random.lognormal(1, 3 + player.pos.x/500.)
             init_velocity = (init_velocity_x, init_velocity_y)
