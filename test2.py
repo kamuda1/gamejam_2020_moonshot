@@ -58,8 +58,7 @@ class Player(pygame.sprite.Sprite):
                 if pressed[pygame.K_w] and self.body.velocity[1] < 10 and self.can_jump:
                     self.can_jump = False
                     move += pygame.Vector2((0, 1)) * 300
-                    pygame.mixer.Sound.play(self.rocket_boost_sound)
-                    pygame.mixer.music.stop()
+                    pygame.mixer.Channel(1).play(self.rocket_boost_sound)
                 if pressed[pygame.K_a] and np.abs(self.body.velocity[1]) < 20:
                     move += pygame.Vector2((-1, 0)) * lateral_strength
                 if pressed[pygame.K_d] and np.abs(self.body.velocity[1]) < 20:
@@ -183,7 +182,10 @@ def main():
     dt = 0
 
     x_offset = 500
+    pygame.mixer.init()
     rocket_boost_sound = pygame.mixer.Sound("rocket_boost.wav")
+    pygame.mixer.Channel(0).play(pygame.mixer.Sound("space_theme.wav"), loops=-1)
+
     image_filename = "satellite_large_img_transparent.png"
 
     background_width = 15000
