@@ -14,9 +14,11 @@ def flipy(y):
 
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self, space, init_pos=(0, 0), image_shape=None, is_player=True, is_geosynch=False, moon_center=(0, 0)):
+    def __init__(self, space, init_pos=(0, 0), image_shape=None, is_player=True, is_geosynch=False, moon_center=(0, 0),
+                 boost_sound=None):
         super().__init__()
         self.game_over = False
+        self.rocket_boost_sound = boost_sound
         self.is_geosynch = is_geosynch
         self.is_player = is_player
         self.image = pygame.image.load("catstronaut.png")
@@ -56,11 +58,12 @@ class Player(pygame.sprite.Sprite):
                 if pressed[pygame.K_w] and self.body.velocity[1] < 10 and self.can_jump:
                     self.can_jump = False
                     move += pygame.Vector2((0, 1)) * 300
+                    pygame.mixer.Sound.play(self.rocket_boost_sound)
+                    pygame.mixer.music.stop()
                 if pressed[pygame.K_a] and np.abs(self.body.velocity[1]) < 20:
                     move += pygame.Vector2((-1, 0)) * lateral_strength
                 if pressed[pygame.K_d] and np.abs(self.body.velocity[1]) < 20:
                     move += pygame.Vector2((1, 0)) * lateral_strength
-
                 if self.body.position.x > 550:
                     self.body.apply_impulse_at_local_point(move)
                     self.body.force = (0, -250)
@@ -74,12 +77,13 @@ class Player(pygame.sprite.Sprite):
             else:
                 self.game_over = True
 
+                self.body.angle += 0.001
+
         elif (np.abs(self.body.position.x-self.moon_center[0]) > 20 or
               np.abs((-self.body.position.y+500)-self.moon_center[1]) > 20):
-            applied_force = (-3*(self.body.position.x-self.moon_center[0]),
-                             3*((-self.body.position.y+500)-self.moon_center[1]))
+            applied_force = (-15*(self.body.position.x-self.moon_center[0]),
+                             15*((-self.body.position.y+500)-self.moon_center[1]))
             self.body.force = applied_force
-            print(applied_force)
 
 
 class Satellite(pygame.sprite.Sprite):
@@ -179,12 +183,12 @@ def main():
     dt = 0
 
     x_offset = 500
-
+    rocket_boost_sound = pygame.mixer.Sound("rocket_boost.wav")
     image_filename = "satellite_large_img_transparent.png"
 
     background_width = 15000
     background_height = 1500
-    level_end = 2000
+    level_end = 3000
 
     space = pymunk.Space()
     space.gravity = 0, 0
@@ -197,7 +201,7 @@ def main():
     moon_center = (x_offset + level_end + 400, background_height / 2)
 
     player = Player(space, init_pos=(90 + x_offset, background_height / 2 - 10), image_shape=[50, 30],
-                    moon_center=moon_center)
+                    moon_center=moon_center, boost_sound=rocket_boost_sound)
 
     sprites = pygame.sprite.Group(player)
     level_sprite_list = create_geosynch_satellites(space, background_height, screen_height=background_height,
