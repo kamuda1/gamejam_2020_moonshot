@@ -76,7 +76,7 @@ class Player(pygame.sprite.Sprite):
             else:
                 self.game_over = True
 
-                self.body.angle += 0.001
+                self.body.angle += 0.05
 
         elif (np.abs(self.body.position.x-self.moon_center[0]) > 20 or
               np.abs((-self.body.position.y+500)-self.moon_center[1]) > 20):
@@ -87,7 +87,7 @@ class Player(pygame.sprite.Sprite):
 
 class Satellite(pygame.sprite.Sprite):
     def __init__(self, space, image_filename=None, init_pos=(0, 0), init_velocity=(0, 0), mass=1, image_shape=None,
-                 is_geosynch=False, is_player=False, screen_height=None):
+                 is_geosynch=False, is_player=False, screen_height=None, init_angular_velocity=0):
         if screen_height is None:
             screen_height = 1500
         self.screen_height = screen_height
@@ -121,6 +121,7 @@ class Satellite(pygame.sprite.Sprite):
         self.shape = pymunk.Poly(self.body, vs)
         self.shape.friction = 0.5
         self.body.velocity = init_velocity
+        self.body.angular_velocity = init_angular_velocity
         self.space.add(self.body, self.shape)
 
     def update(self, events, dt, other_sprites=None):
@@ -147,7 +148,7 @@ class Satellite(pygame.sprite.Sprite):
             self.space.remove(self.body, self.shape)
             self.kill()
             new_vect = pygame.Vector2(self.body.position[0], -self.body.position[1] + 500)
-            satellite_to_return = Satellite(self.space, "nacho_sprite.png", init_pos=new_vect,
+            satellite_to_return = Satellite(self.space, "sputnik_custom.png", init_pos=new_vect,
                                             init_velocity=(0, 5), screen_height=self.screen_height)
             # other_sprites.add(satellite)
 
@@ -182,8 +183,9 @@ def main():
     dt = 0
 
     x_offset = 500
-    pygame.mixer.init()
+    pygame.mixer.init(frequency=192000)
     rocket_boost_sound = pygame.mixer.Sound("rocket_boost.wav")
+    pygame.mixer.Channel(0).set_volume(50)
     pygame.mixer.Channel(0).play(pygame.mixer.Sound("space_theme.wav"), loops=-1)
 
     image_filename = "satellite_large_img_transparent.png"
@@ -243,9 +245,16 @@ def main():
             init_velocity_y = -100 - np.random.lognormal(1, 3 + player.pos.x/500.)
             init_velocity = (init_velocity_x, init_velocity_y)
 
-            init_size = np.random.uniform(5, 35)
-            satellite = Satellite(space, "nacho_sprite.png", init_pos=(x_pos, -10), init_velocity=init_velocity,
-                                  screen_height=background_height, image_shape=(int(init_size), int(init_size)))
+            if random.random() <= 0.8:
+                init_size = np.random.uniform(15, 25)
+                satellite = Satellite(space, "sputnik_custom.png", init_pos=(x_pos, -10), init_velocity=init_velocity,
+                                      screen_height=background_height, image_shape=(int(init_size), int(init_size)),
+                                      init_angular_velocity=np.random.uniform(-10, 10))
+            else:
+                init_size = np.random.uniform(35, 55)
+                satellite = Satellite(space, "gold_satellite.png", init_pos=(x_pos, -10), init_velocity=init_velocity,
+                                      screen_height=background_height, image_shape=(int(3*init_size), int(init_size)),
+                                      init_angular_velocity=np.random.uniform(-10, 10), mass=5)
             sprites.add(satellite)
 
         # copy/paste because I'm lazy
