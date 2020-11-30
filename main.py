@@ -21,7 +21,7 @@ class Player(pygame.sprite.Sprite):
         self.rocket_boost_sound = boost_sound
         self.is_geosynch = is_geosynch
         self.is_player = is_player
-        self.image = pygame.image.load("catstronaut.png")
+        self.image = pygame.image.load("images/catstronaut.png")
         self.moon_center = moon_center
         if image_shape:
             self.image = pygame.transform.scale(self.image, image_shape)
@@ -94,9 +94,9 @@ class Satellite(pygame.sprite.Sprite):
         super().__init__()
         self.satellite_images_health = None
         if image_filename is None:
-            self.satellite_images_health = {'low': "satellite_large_low_health.png",
-                                            'med': "satellite_large_med_health.png",
-                                            'high': "satellite_large_high_health.png",
+            self.satellite_images_health = {'low': "images/satellite_large_low_health.png",
+                                            'med': "images/satellite_large_med_health.png",
+                                            'high': "images/satellite_large_high_health.png",
                                             }
             image_filename = self.satellite_images_health['high']
 
@@ -148,7 +148,7 @@ class Satellite(pygame.sprite.Sprite):
             self.space.remove(self.body, self.shape)
             self.kill()
             new_vect = pygame.Vector2(self.body.position[0], -self.body.position[1] + 500)
-            satellite_to_return = Satellite(self.space, "sputnik_custom.png", init_pos=new_vect,
+            satellite_to_return = Satellite(self.space, "images/sputnik_custom.png", init_pos=new_vect,
                                             init_velocity=(0, 5), screen_height=self.screen_height)
             # other_sprites.add(satellite)
 
@@ -184,11 +184,9 @@ def main():
 
     x_offset = 500
     pygame.mixer.init(frequency=192000)
-    rocket_boost_sound = pygame.mixer.Sound("rocket_boost.wav")
+    rocket_boost_sound = pygame.mixer.Sound("sounds/rocket_boost.wav")
     pygame.mixer.Channel(0).set_volume(50)
-    pygame.mixer.Channel(0).play(pygame.mixer.Sound("space_theme.wav"), loops=-1)
-
-    image_filename = "satellite_large_img_transparent.png"
+    pygame.mixer.Channel(0).play(pygame.mixer.Sound("sounds/space_theme.wav"), loops=-1)
 
     background_width = 15000
     background_height = 1500
@@ -196,11 +194,11 @@ def main():
 
     space = pymunk.Space()
     space.gravity = 0, 0
-    earth_image = pygame.image.load('earth.png')
+    earth_image = pygame.image.load('images/earth.png')
     earth_image = pygame.transform.scale(earth_image, (background_height//2, background_height//2))
     earth_center = (x_offset - 650, background_height / 2 - 300)
 
-    moon_image = pygame.image.load('moon.png')
+    moon_image = pygame.image.load('images/moon.png')
     moon_image = pygame.transform.scale(moon_image, (200, 200))
     moon_center = (x_offset + level_end + 400, background_height / 2)
 
@@ -247,12 +245,12 @@ def main():
 
             if random.random() <= 0.8:
                 init_size = np.random.uniform(15, 25)
-                satellite = Satellite(space, "sputnik_custom.png", init_pos=(x_pos, -10), init_velocity=init_velocity,
+                satellite = Satellite(space, "images/sputnik_custom.png", init_pos=(x_pos, -10), init_velocity=init_velocity,
                                       screen_height=background_height, image_shape=(int(init_size), int(init_size)),
                                       init_angular_velocity=np.random.uniform(-10, 10))
             else:
                 init_size = np.random.uniform(35, 55)
-                satellite = Satellite(space, "gold_satellite.png", init_pos=(x_pos, -10), init_velocity=init_velocity,
+                satellite = Satellite(space, "images/gold_satellite.png", init_pos=(x_pos, -10), init_velocity=init_velocity,
                                       screen_height=background_height, image_shape=(int(3*init_size), int(init_size)),
                                       init_angular_velocity=np.random.uniform(-10, 10), mass=5)
             sprites.add(satellite)
