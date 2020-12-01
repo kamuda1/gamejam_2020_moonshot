@@ -183,6 +183,15 @@ class Game(States):
     def __init__(self):
         States.__init__(self)
         self.next = 'menu'
+        self.startup()
+
+    def cleanup(self):
+        print('cleaning up Game state stuff')
+        self.space = None
+        self.player = None
+        self.sprites = None
+
+    def startup(self):
         pg.mixer.init(frequency=192000)
         rocket_boost_sound = pg.mixer.Sound(resource_path("sounds/rocket_boost.wav"))
         pg.mixer.Channel(0).set_volume(50)
@@ -222,12 +231,6 @@ class Game(States):
         for _ in range(80000):
             x, y = random.randint(0, self.background_width), random.randint(0, self.background_height)
             pg.draw.rect(self.background, (200, 200, 200), (x, y, 2, 2))
-
-    def cleanup(self):
-        print('cleaning up Game state stuff')
-
-    def startup(self):
-        print('starting Game state stuff')
 
     def get_event(self, event):
         if event.type == pg.QUIT:
@@ -323,6 +326,7 @@ class Game(States):
         space.step(dt / 1000)
 
         if player.pos[1] > 0.8 * self.background_height:
+            self.cleanup()
             self.done = True
 
     def draw(self, screen):
