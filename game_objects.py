@@ -1,6 +1,18 @@
 import pygame
 import pymunk
 import numpy as np
+import os
+import sys
+
+
+def resource_path(relative_path):
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
 
 
 class Player(pygame.sprite.Sprite):
@@ -11,7 +23,7 @@ class Player(pygame.sprite.Sprite):
         self.rocket_boost_sound = boost_sound
         self.is_geosynch = is_geosynch
         self.is_player = is_player
-        self.image = pygame.image.load("images/catstronaut.png")
+        self.image = pygame.image.load(resource_path("images/catstronaut.png"))
         self.moon_center = moon_center
         if image_shape:
             self.image = pygame.transform.scale(self.image, image_shape)
@@ -84,9 +96,9 @@ class Satellite(pygame.sprite.Sprite):
         super().__init__()
         self.satellite_images_health = None
         if image_filename is None:
-            self.satellite_images_health = {'low': "images/satellite_large_low_health.png",
-                                            'med': "images/satellite_large_med_health.png",
-                                            'high': "images/satellite_large_high_health.png",
+            self.satellite_images_health = {'low': resource_path("images/satellite_large_low_health.png"),
+                                            'med': resource_path("images/satellite_large_med_health.png"),
+                                            'high': resource_path("images/satellite_large_high_health.png"),
                                             }
             image_filename = self.satellite_images_health['high']
 
@@ -138,9 +150,8 @@ class Satellite(pygame.sprite.Sprite):
             self.space.remove(self.body, self.shape)
             self.kill()
             new_vect = pygame.Vector2(self.body.position[0], -self.body.position[1] + 500)
-            satellite_to_return = Satellite(self.space, "images/sputnik_custom.png", init_pos=new_vect,
+            satellite_to_return = Satellite(self.space, resource_path("images/sputnik_custom.png"), init_pos=new_vect,
                                             init_velocity=(0, 5), screen_height=self.screen_height)
-            # other_sprites.add(satellite)
 
         self.die(other_sprites)
         return satellite_to_return

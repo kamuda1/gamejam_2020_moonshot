@@ -5,7 +5,7 @@ import random
 import pymunk
 import numpy as np
 from pymunk import Vec2d
-from game_objects import Satellite, Player
+from game_objects import Satellite, Player, resource_path
 import sys
 
 
@@ -184,9 +184,9 @@ class Game(States):
         States.__init__(self)
         self.next = 'menu'
         pg.mixer.init(frequency=192000)
-        rocket_boost_sound = pg.mixer.Sound("sounds/rocket_boost.wav")
+        rocket_boost_sound = pg.mixer.Sound(resource_path("sounds/rocket_boost.wav"))
         pg.mixer.Channel(0).set_volume(50)
-        pg.mixer.Channel(0).play(pygame.mixer.Sound("sounds/space_theme.wav"), loops=-1)
+        pg.mixer.Channel(0).play(pygame.mixer.Sound(resource_path("sounds/space_theme.wav")), loops=-1)
 
         x_offset = 500
         self.background_width = 15000
@@ -195,11 +195,11 @@ class Game(States):
 
         self.space = pymunk.Space()
         self.space.gravity = 0, 0
-        earth_image = pg.image.load('images/earth.png')
+        earth_image = pg.image.load(resource_path('images/earth.png'))
         self.earth_image = pg.transform.scale(earth_image, (self.background_height // 2, self.background_height // 2))
         self.earth_center = (x_offset - 650, self.background_height / 2 - 300)
 
-        self.moon_image = pg.image.load('images/moon.png')
+        self.moon_image = pg.image.load(resource_path('images/moon.png'))
         self.moon_image = pg.transform.scale(self.moon_image, (200, 200))
         self.moon_center = (x_offset + self.level_end + 400, self.background_height / 2)
 
@@ -260,19 +260,9 @@ class Game(States):
         background_height = self.background_height
         space = self.space
         sprites = self.sprites
-        ticks_to_next_spawn = 10
         x_offset = 500
-        # while True:
-        #     events = pg.event.get()
-        #     for e in events:
-        #         if e.type == pg.QUIT:
-        #             return
         events = pg.event.get()
-        ticks_to_next_spawn -= 1
-        if ticks_to_next_spawn <= 0 and player.pos.x < x_offset + level_end:
-            ticks_to_next_spawn_init = 20
-            ticks_to_next_spawn = np.max([2, ticks_to_next_spawn_init - player.pos.x / 1000])
-
+        if random.random() < 0.05 and player.pos.x < x_offset + level_end:
             x_pos_max = player.pos.x + 750
             if x_pos_max > x_offset + level_end:
                 x_pos_max = x_offset + level_end - 100
@@ -283,13 +273,13 @@ class Game(States):
 
             if random.random() <= 0.8:
                 init_size = np.random.uniform(15, 25)
-                satellite = Satellite(space, "images/sputnik_custom.png", init_pos=(x_pos, -10),
+                satellite = Satellite(space, resource_path("images/sputnik_custom.png"), init_pos=(x_pos, -10),
                                       init_velocity=init_velocity,
                                       screen_height=background_height, image_shape=(int(init_size), int(init_size)),
                                       init_angular_velocity=np.random.uniform(-10, 10))
             else:
                 init_size = np.random.uniform(35, 55)
-                satellite = Satellite(space, "images/gold_satellite.png", init_pos=(x_pos, -10),
+                satellite = Satellite(space, resource_path("images/gold_satellite.png"), init_pos=(x_pos, -10),
                                       init_velocity=init_velocity,
                                       screen_height=background_height,
                                       image_shape=(int(3 * init_size), int(init_size)),
@@ -333,7 +323,7 @@ class Game(States):
         space.step(dt / 1000)
 
         if player.pos[1] > 0.8 * self.background_height:
-            self.quit = True
+            self.done = True
 
     def draw(self, screen):
         screen.fill((0, 0, 255))
