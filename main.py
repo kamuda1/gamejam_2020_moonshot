@@ -60,6 +60,19 @@ class MenuManager:
 
     def draw_menu(self, screen):
         '''handle drawing of the menu options'''
+        title_font = pg.font.SysFont("arial", 70)
+        title_rend = title_font.render('Catstronaut', 1, (200, 200, 250))
+        title_rect = title_rend.get_rect()
+        title_rect.center = (250, 50)
+
+        subtitle_font = pg.font.SysFont("arial", 40)
+        subtitle_rend = subtitle_font.render('To The Moon', 1, (200, 200, 250))
+        subtitle_rect = subtitle_rend.get_rect()
+        subtitle_rect.center = (250, 105)
+
+        screen.blit(title_rend, title_rect)
+        screen.blit(subtitle_rend, subtitle_rect)
+
         for i, opt in enumerate(self.rendered["des"]):
             opt[1].center = (self.screen_rect.centerx, self.from_bottom + i * self.spacer)
             if i == self.selected_index:
@@ -158,12 +171,14 @@ class Menu(States, MenuManager):
         self.pre_render_options()
         self.from_bottom = 200
         self.spacer = 75
+        self.startup()
 
     def cleanup(self):
         print('cleaning up Main Menu state stuff')
 
     def startup(self):
-        print('starting Main Menu state stuff')
+        self.stars_x = np.random.randint(0, self.screen.get_width(), 1000)
+        self.stars_y = np.random.randint(0, self.screen.get_height(), 1000)
 
     def get_event(self, event):
         if event.type == pg.QUIT:
@@ -175,7 +190,15 @@ class Menu(States, MenuManager):
         self.draw(screen)
 
     def draw(self, screen):
-        screen.fill((255, 0, 0))
+        screen.fill((30, 30, 30))
+        for x, y in zip(self.stars_x, self.stars_y):
+            pygame.draw.rect(screen, (200, 200, 200), (x, y, 2, 2))
+        cat_image = pygame.image.load(resource_path("images/catstronaut.png"))
+        cat_image = pygame.transform.scale(cat_image, (3421//6, 1706//6))
+        moon_image = pg.image.load(resource_path('images/moon.png'))
+        moon_image = pygame.transform.scale(moon_image, (100, 100))
+        screen.blit(cat_image, (-95, 220))
+        screen.blit(moon_image, (300, 110))
         self.draw_menu(screen)
 
 
